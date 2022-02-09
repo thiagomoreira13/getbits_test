@@ -1,0 +1,65 @@
+service: payment-service
+
+frameworkVersion: ">=1.1.0 <2.0.0"
+
+provider:
+  name: aws
+  runtime: nodejs4.3
+  environment:
+    PAYMENT_TABLE: payment-${opt:stage, self:provider.stage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+      Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/payment-*"
+
+functions:
+  paymentSubmission:
+    handler: api/payment.submit
+    memorySize: 128
+    description: Submit monthly payment information and store it in database.
+    events:
+      - http: 
+          path: payments
+          method: post
+          cors: true
+  listpayments:
+    handler: api/payment.list
+    memorySize: 128
+    description: List all payments
+    events:
+      - http: 
+          path: payments
+          method: get
+          cors: true
+  paymentDetails:
+    handler: api/payment.get
+    events:
+      - http:
+          path: payments/{id}
+          method: get
+          cors: true
+
+resources:
+  Resources:
+    paymentsDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        StreamSpecification:
+          StreamViewType: "NEW_IMAGE"
+        TableName: ${self:provider.environment.payment_TABLE}
